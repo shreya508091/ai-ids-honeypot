@@ -14,3 +14,6 @@ fix_paths.py
 KDDTest-Copy1.txt
 logs/*.jsonl
 logs/blocked_ips.txt
+
+data/KDDTrain.txt
+data/KDDTest.txt
