@@ -1,4 +1,4 @@
-import json, pathlib
+import json, pathlib, time
 import numpy as np, joblib
 from datetime import datetime
 from flask import Flask, jsonify, Response
@@ -42,9 +42,19 @@ def reasons(row):
     return [FEATURES[i] + (" raises" if s[i] > 0 else " lowers") + " risk" for i in top]
 
 app = Flask(__name__)
+NOTIFY_LOG = BASE / "logs" / "notifications.log"
+notified_ips = set()
+last_ai_notify = 0
+
+def notify(msg):
+    NOTIFY_LOG.parent.mkdir(exist_ok=True)
+    with open(NOTIFY_LOG, "a", encoding="utf-8") as f:
+        f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} | {msg}\n")
+    print("NOTIFY:", msg)
 
 @app.route("/api/alerts")
 def alerts():
+    global last_ai_notify
     idx = np.random.choice(len(X), 30, replace=False)
     p = model.predict_proba(X[idx])[:, 0]          # probability of attack
     out = []
@@ -56,6 +66,11 @@ def alerts():
                         "really_attack": bool(y[i] == 0),
                         "why": reasons(X[i])})
     out.sort(key=lambda a: -a["p_attack"])
+    highs = [a for a in out if a["severity"] == "High"]
+    if highs and time.time() - last_ai_notify > 60:
+        top = highs[0]
+        notify(f"HIGH ALERT: P(attack)={top['p_attack']} | why: {'; '.join(top['why'])}")
+        last_ai_notify = time.time()
     return jsonify(out)
 
 @app.route("/api/honeypot")
@@ -73,10 +88,13 @@ def honeypot():
         if e.get("event") == "login_attempt":
             attempts[e["src_ip"]] = attempts.get(e["src_ip"], 0) + 1
     blocked = sorted(ip for ip, n in attempts.items() if n >= BLOCK_AFTER)
+    for ip in blocked:
+        if ip not in notified_ips:
+            notified_ips.add(ip)
+            notify(f"BLOCKED IP {ip} after {attempts[ip]} failed logins on honeypot")
     (BASE / "logs").mkdir(exist_ok=True)
     (BASE / "logs" / "blocked_ips.txt").write_text("\n".join(blocked), encoding="utf-8")
     return jsonify({"events": events[-15:][::-1], "total": len(events), "blocked": blocked})
-
 PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>AI-IDS Dashboard</title>
 <style>
 body{font-family:Segoe UI,Arial;margin:20px;background:#f4f6f8}

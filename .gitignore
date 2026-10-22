@@ -17,3 +17,5 @@ logs/blocked_ips.txt
 
 data/KDDTrain.txt
 data/KDDTest.txt
+
+logs/notifications.log
