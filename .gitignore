@@ -3,3 +3,14 @@ __pycache__/
 *.pyc
 data/*.csv
 .env
+
+logs/*.jsonl
+
+logs/blocked_ips.txt
+
+.ipynb_checkpoints/
+*.npy
+fix_paths.py
+KDDTest-Copy1.txt
+logs/*.jsonl
+logs/blocked_ips.txt
